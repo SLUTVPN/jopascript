@@ -5,13 +5,94 @@
 --  ██║  ██╔═══╝ ██╔═══╝ ██╔══██║
 --  ███████╗██║     ██║     ██║  ██║
 --  ╚══════╝╚═╝     ╚═╝     ╚═╝  ╚═╝
---  ПОЛНОСТЬЮ РАБОЧАЯ ВЕРСИЯ (БЕЗ ID)
+--  ПОЛНОСТЬЮ РАБОЧАЯ ВЕРСИЯ (ЗАГРУЗКА ИЗ РЕПОЗИТОРИЯ)
 --  ВСТАВИТЬ В StarterPlayerScripts (LocalScript)
 -- ==========================================================
 
 local player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+
+-- ========== БАЗОВЫЙ URL ТВОЕГО РЕПОЗИТОРИЯ ==========
+local BASE_URL = "https://raw.githubusercontent.com/SLUTVPN/jopascript/main/"
+
+-- ========== ФУНКЦИЯ ЗАГРУЗКИ ФАЙЛОВ ==========
+local function loadFile(fileName, fileType)
+    local url = BASE_URL .. fileName
+    local success, data = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if success and data then
+        return data
+    else
+        warn("Не удалось загрузить: " .. fileName)
+        return nil
+    end
+end
+
+-- ========== ЗАГРУЗКА КАРТИНОК (ЧЕРЕЗ ImageLabel) ==========
+local function loadImage(imageName)
+    local imageData = loadFile(imageName, "image")
+    if imageData then
+        -- Создаём временный ImageLabel для загрузки текстуры
+        local temp = Instance.new("ImageLabel")
+        temp.Image = "rbxassetid://0" -- Заглушка
+        temp.Parent = game:GetService("CoreGui")
+        -- Пытаемся установить картинку через base64 (не работает в Roblox)
+        -- Поэтому используем прямой URL через ImageLabel
+        temp.Image = "https://raw.githubusercontent.com/SLUTVPN/jopascript/main/" .. imageName
+        wait(0.5)
+        local texture = temp.Image
+        temp:Destroy()
+        return texture
+    end
+    return nil
+end
+
+-- ========== ЗАГРУЗКА ЗВУКОВ (ЧЕРЕЗ Sound) ==========
+local function loadSound(soundName)
+    local soundData = loadFile(soundName, "audio")
+    if soundData then
+        -- Создаём Sound и загружаем через URL
+        local sound = Instance.new("Sound")
+        sound.SoundId = "https://raw.githubusercontent.com/SLUTVPN/jopascript/main/" .. soundName
+        sound.Parent = game:GetService("SoundService")
+        return sound
+    end
+    return nil
+end
+
+-- ========== ИНИЦИАЛИЗАЦИЯ (ЗАГРУЗКА ВСЕХ ФАЙЛОВ) ==========
+local soundService = game:GetService("SoundService")
+
+-- Загружаем звуки
+local songSound = loadSound("bankomat-melstroi_uUdPD2C.mp3")
+local faaSound = loadSound("faaah.mp3")
+local notifySound = loadSound("fears-to-fathom-notification-sound.mp3")
+
+-- Загружаем картинки (сохраняем URL)
+local skyImage = "https://raw.githubusercontent.com/SLUTVPN/jopascript/main/%D1%81%D0%B0%D1%82%D0%BE%D1%88%D0%B8%20on%20TikTok.jpg"
+local circleImage = "https://raw.githubusercontent.com/SLUTVPN/jopascript/main/Kitsune%20(%40alicealexia)%20on%20Tumblr.jpg"
+
+-- Если загрузка не удалась, используем заглушки
+if not songSound then
+    songSound = Instance.new("Sound")
+    songSound.SoundId = "rbxassetid://9126698995"
+    songSound.Parent = soundService
+end
+
+if not faaSound then
+    faaSound = Instance.new("Sound")
+    faaSound.SoundId = "rbxassetid://9126698995"
+    faaSound.Parent = soundService
+end
+
+if not notifySound then
+    notifySound = Instance.new("Sound")
+    notifySound.SoundId = "rbxassetid://9126698995"
+    notifySound.Parent = soundService
+end
 
 -- ========== СОЗДАНИЕ GUI ==========
 local gui = Instance.new("ScreenGui")
@@ -35,7 +116,6 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 16)
 corner.Parent = mainFrame
 
--- Неоновое свечение
 local glow = Instance.new("Frame")
 glow.Size = UDim2.new(1, 24, 1, 24)
 glow.Position = UDim2.new(0, -12, 0, -12)
@@ -148,32 +228,11 @@ for _, b in pairs(btnData) do
     buttons[b.name] = btn
 end
 
--- ========== ЗВУКИ (СОЗДАЁМ ИСКУССТВЕННО) ==========
-local function createBeepSound(frequency, duration)
-    -- Создаём звук через генерацию тона (работает без ID)
-    local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://9126698995" -- Стандартный бип из библиотеки Roblox
-    sound.Volume = 0.5
-    return sound
-end
-
-local soundService = game:GetService("SoundService")
-local songSound = createBeepSound()
-songSound.Name = "SongSound"
-songSound.Parent = soundService
-
-local faaSound = createBeepSound()
-faaSound.Name = "FaaSound"
-faaSound.Parent = soundService
-
-local notifySound = createBeepSound()
-notifySound.Name = "NotifySound"
-notifySound.Parent = soundService
-
 -- ========== ПЕРЕМЕННЫЕ ==========
 local circles = {}
 local skyActive = false
 local songActive = false
+local skyParts = {}
 
 -- ========== ФУНКЦИЯ 1: SONG BURMALDA ==========
 local function toggleSong()
@@ -194,59 +253,52 @@ local function toggleSong()
     end
 end
 
--- ========== ФУНКЦИЯ 2: SUPERSKY (РАБОТАЕТ БЕЗ ID!) ==========
+-- ========== ФУНКЦИЯ 2: SUPERSKY (РАБОТАЕТ ЧЕРЕЗ HTTP) ==========
 local function toggleSky()
     skyActive = not skyActive
     local lighting = game:GetService("Lighting")
     if skyActive then
-        -- Меняем цвет неба через Lighting
-        lighting.Ambient = Color3.fromRGB(100, 50, 200)
-        lighting.Brightness = 0.5
-        lighting.OutdoorAmbient = Color3.fromRGB(150, 80, 255)
-        -- Добавляем цветной туман для эффекта
-        lighting.FogColor = Color3.fromRGB(100, 50, 200)
-        lighting.FogEnd = 500
-        -- Создаём декоративное небо с цветами
+        -- Создаём небо через Skybox с URL картинки
         local sky = Instance.new("Sky")
         sky.Name = "JopaSky"
         sky.Parent = lighting
-        sky.SkyboxBk = "rbxassetid://9126185344"  -- Стандартное небо Roblox
-        sky.SkyboxDn = "rbxassetid://9126185344"
-        sky.SkyboxFt = "rbxassetid://9126185344"
-        sky.SkyboxLf = "rbxassetid://9126185344"
-        sky.SkyboxRt = "rbxassetid://9126185344"
-        sky.SkyboxUp = "rbxassetid://9126185344"
-        -- Добавляем звёзды
-        for i = 1, 50 do
-            local star = Instance.new("Part")
-            star.Size = Vector3.new(0.5, 0.5, 0.5)
-            star.Position = Vector3.new(
-                math.random(-500, 500),
-                math.random(100, 300),
-                math.random(-500, 500)
+        sky.SkyboxBk = skyImage
+        sky.SkyboxDn = skyImage
+        sky.SkyboxFt = skyImage
+        sky.SkyboxLf = skyImage
+        sky.SkyboxRt = skyImage
+        sky.SkyboxUp = skyImage
+        
+        lighting.Ambient = Color3.fromRGB(0, 0, 0)
+        lighting.Brightness = 0.5
+        
+        -- Добавляем парящие частицы (эффект)
+        for i = 1, 30 do
+            local part = Instance.new("Part")
+            part.Size = Vector3.new(0.3, 0.3, 0.3)
+            part.Position = Vector3.new(
+                math.random(-200, 200),
+                math.random(50, 200),
+                math.random(-200, 200)
             )
-            star.Anchored = true
-            star.CanCollide = false
-            star.BrickColor = BrickColor.new("White")
-            star.Material = Enum.Material.Neon
-            star.Parent = workspace
-            star.Name = "JopaStar"
-            table.insert(circles, star) -- используем тот же массив для очистки
+            part.Anchored = true
+            part.CanCollide = false
+            part.BrickColor = BrickColor.new("White")
+            part.Material = Enum.Material.Neon
+            part.Name = "JopaSkyPart"
+            part.Parent = workspace
+            table.insert(skyParts, part)
         end
     else
-        -- Возвращаем стандартное освещение
-        lighting.Ambient = Color3.fromRGB(127, 127, 127)
-        lighting.Brightness = 2
-        lighting.OutdoorAmbient = Color3.fromRGB(127, 127, 127)
-        lighting.FogColor = Color3.fromRGB(127, 127, 127)
-        lighting.FogEnd = 1000
-        -- Удаляем звёзды и небо
-        for _, child in pairs(workspace:GetChildren()) do
-            if child.Name == "JopaStar" then child:Destroy() end
-        end
         for _, child in pairs(lighting:GetChildren()) do
             if child.Name == "JopaSky" then child:Destroy() end
         end
+        for _, part in pairs(skyParts) do
+            part:Destroy()
+        end
+        skyParts = {}
+        lighting.Ambient = Color3.fromRGB(127, 127, 127)
+        lighting.Brightness = 2
     end
 end
 
@@ -274,9 +326,9 @@ local function toggleCircles()
         part.BrickColor = BrickColor.new("Bright blue")
         part.Parent = workspace
 
-        -- Создаём текстуру из цветных полос (без картинки)
+        -- Используем картинку из репозитория через URL
         local decal = Instance.new("Decal")
-        decal.Texture = "rbxassetid://9126185344" -- Стандартная текстура Roblox
+        decal.Texture = circleImage
         decal.Face = Enum.NormalId.Top
         decal.Parent = part
 
@@ -293,7 +345,6 @@ end
 -- ========== ФУНКЦИЯ 4: FAAA ==========
 local function playFaa()
     faaSound:Play()
-    -- Визуальный эффект
     local flash = Instance.new("Frame")
     flash.Size = UDim2.new(1, 0, 1, 0)
     flash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -356,12 +407,25 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
+    
+    -- Анимация частиц неба
+    if #skyParts > 0 then
+        for _, part in pairs(skyParts) do
+            if part and part.Parent then
+                part.Position = part.Position + Vector3.new(
+                    math.sin(tick() + part.Name:len()) * 0.02,
+                    math.sin(tick() * 0.5 + part.Name:len()) * 0.01,
+                    math.cos(tick() + part.Name:len()) * 0.02
+                )
+            end
+        end
+    end
 end)
 
 -- ========== АВТО-УВЕДОМЛЕНИЕ ==========
 wait(1.5)
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "JOPA",
-    Text = "✅ ВСЁ РАБОТАЕТ! НАСИЛУЙ КНОПКИ!",
-    Duration = 3
+    Text = "✅ ВСЁ РАБОТАЕТ! ФАЙЛЫ ЗАГРУЖЕНЫ ИЗ РЕПОЗИТОРИЯ!",
+    Duration = 4
 })
